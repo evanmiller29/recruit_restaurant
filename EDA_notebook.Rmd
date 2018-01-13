@@ -1,8 +1,10 @@
 ---
 title: "Recruit restaurant visitor competition EDA"
-output: 
+output:
+  html_document:
+    toc: yes
   html_notebook:
-    toc: true
+    toc: yes
 ---
 
 # Introduction
@@ -17,14 +19,15 @@ See here for more information: https://www.kaggle.com/c/recruit-restaurant-visit
 * https://www.kaggle.com/breakfastpirate/weeks-before-after-golden-week-2016
 * https://www.kaggle.com/timolee/feeling-hungry-a-beginner-s-guide-to-arima-models
 
-```{r, libs, message = FALSE}
+```{r, libs, message = FALSE, warning = FALSE}
 library(ggplot2)
 library(ggTimeSeries)
 library(tidyverse)
 library(lubridate)
+library(scales)
 ```
 
-```{r, read_data}
+```{r, read_data, echo = FALSE}
 data_path <- 'F:/Nerdy Stuff/Kaggle/Recruit'
 setwd(data_path)
 
@@ -52,7 +55,7 @@ air_res <- air_res %>%
          time_after_book_visit = difftime(visit_datetime, reserve_datetime, units = 'hours'),
          year_reserve = year(reserve_datetime),
          year_visit = year(visit_datetime)) %>% 
-  mutate(time_after_book_visit = as.integer(time_after_book_visit))
+  mutate(hours_after_book_visit = as.integer(time_after_book_visit))
 
 glimpse(air_res)
 
@@ -65,28 +68,57 @@ g1 + theme_minimal() + scale_x_date(date_breaks = '2 months') +
        y = 'Number of people in reservation',
        title = 'Air reservations')
 
-p1 <- air_res %>% 
-  select(visit_datetime, reserve_visitors, year_visit) %>% 
-  na.omit() %>% 
-  ggplot_calendar_heatmap(
-   'visit_datetime',
-   'reserve_visitors'
-)
+g1 <- air_res %>% 
+  filter(hours_after_book_visit < 168) %>% 
+  ggplot(aes(x = hours_after_book_visit)) + geom_histogram()
 
-p1 + 
-   ylab(NULL) + xlab(NULL) +
-   scale_fill_continuous(low = 'green', high = 'red') + 
-   facet_wrap(~year_visit, nrow = 2)
+g1 + theme_minimal() + labs(y = 'Count',
+                            x = '',
+                            title = 'Hours between booking and going to the restaurant') +
+  scale_y_continuous(breaks = seq(0, 20000, by = 2500), limits = c(0, 20000), labels =comma)
+
+g1 <- ggplot(air_res, aes(x = as.Date(visit_datetime), y = hours_after_book_visit)) +
+  geom_jitter(alpha = 0.4) + geom_smooth() 
+
+g1 + theme_minimal() + scale_x_date(date_breaks = '2 months') + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = 'Date of visit',
+       y = 'Hours between booking and going to the restaurant',
+       title = 'Does the amount of time between booking and going change over time?',
+       subtitle = 'Maybe, but there is definitely a few weird days..')
 
 ```
-Observations:
+
+### Observations:
 
 * There's quite a large break in the dataset from August 2016 to October
+* Hours between booking and going to the restaurant have a few days with very weird patterns
+* From Aprilish onwards there is no reservations with very bookings with low hours between booking and turning up
 
 ```{r}
 
-air_res %>% 
-  sample_n(10)
+g1 <- ggplot(air_res, aes(y = hours_after_book_visit, x = reserve_visitors)) + 
+  geom_jitter(alpha = 0.5) + geom_smooth()
+  
+g1 + theme_minimal() + labs(y = 'Hours between booking and going to the restaurant',
+                            x = 'Number of people on the reservation',
+                            title = 'Relationship between booking size and time lag between book and visit',
+                            subtitle = 'Nice looking positive trend') + 
+  scale_y_continuous(breaks = seq(0, 10000, by = 1000), limits = c(0, 10000), labels = comma)
 
+```
+
+```{r}
+
+g1 <- air_res %>% 
+  filter(visit_datetime > "2017-04-15") %>% 
+           ggplot(aes(x = as.Date(visit_datetime), y = hours_after_book_visit)) +
+  geom_jitter(alpha = 0.4) + geom_smooth() 
+
+g1 + theme_minimal() + scale_x_date(date_breaks = '5 days') + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = 'Date of visit',
+       y = 'Hours between booking and going to the restaurant',
+       title = 'Looks like new resevations arent included after April the 20th')
 
 ```
