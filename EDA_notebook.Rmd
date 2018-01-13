@@ -21,7 +21,7 @@ See here for more information: https://www.kaggle.com/c/recruit-restaurant-visit
 library(ggplot2)
 library(ggTimeSeries)
 library(tidyverse)
-
+library(lubridate)
 ```
 
 ```{r, read_data}
@@ -33,14 +33,60 @@ air_store_info <- read_csv('air_store_info.csv')
 air_visit_data <- read_csv('air_visit_data.csv')
 
 date_info <- read_csv('date_info.csv')
-hpg_res <- read_csv('hpg_reserve')
+hpg_res <- read_csv('hpg_reserve.csv')
 hpg_store_info <- read_csv('hpg_store_info.csv')
 samp_sub <- read_csv('sample_submission.csv')
 store_id <- read_csv('store_id_relation.csv')
 
 ```
 
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+# Analysis
 
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+## Air dataset
 
+```{r}
+
+air_res <- air_res %>% 
+  mutate(visit_hour = hour(visit_datetime),
+         res_hour = hour(reserve_datetime),
+         time_after_book_visit = difftime(visit_datetime, reserve_datetime, units = 'hours'),
+         year_reserve = year(reserve_datetime),
+         year_visit = year(visit_datetime)) %>% 
+  mutate(time_after_book_visit = as.integer(time_after_book_visit))
+
+glimpse(air_res)
+
+g1 <- ggplot(air_res, aes(x = as.Date(visit_datetime), y = reserve_visitors)) +
+  geom_jitter(alpha = 0.4) + geom_smooth() 
+
+g1 + theme_minimal() + scale_x_date(date_breaks = '2 months') + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = 'Date of visit',
+       y = 'Number of people in reservation',
+       title = 'Air reservations')
+
+p1 <- air_res %>% 
+  select(visit_datetime, reserve_visitors, year_visit) %>% 
+  na.omit() %>% 
+  ggplot_calendar_heatmap(
+   'visit_datetime',
+   'reserve_visitors'
+)
+
+p1 + 
+   ylab(NULL) + xlab(NULL) +
+   scale_fill_continuous(low = 'green', high = 'red') + 
+   facet_wrap(~year_visit, nrow = 2)
+
+```
+Observations:
+
+* There's quite a large break in the dataset from August 2016 to October
+
+```{r}
+
+air_res %>% 
+  sample_n(10)
+
+
+```
